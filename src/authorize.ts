@@ -5,7 +5,7 @@ import { createServer } from "node:http";
 import { loadCredentials, defaultTokensPath } from "./config.js";
 import { FileTokenStore } from "./zoomClient.js";
 
-const PORT = Number(process.env.ZOOM_MCP_AUTH_PORT || 8787);
+const PORT = Number(process.env.ZOOM_MCP_AUTH_PORT || 8765);
 const redirect = process.env.ZOOM_MCP_REDIRECT_URI || `http://localhost:${PORT}/callback`;
 const creds = loadCredentials();
 const state = Math.random().toString(36).slice(2);

@@ -37,7 +37,7 @@ Environment variables win over the file. Override the file location with `ZOOM_M
 
 Leave `ZOOM_ACCOUNT_ID` empty and the server uses user OAuth instead (acts as you, so it can only manage meetings you host, or all of them if your role allows with admin scopes):
 
-1. In the Zoom app > **Basic Information**, set the **OAuth Redirect URL** and add it to the **allow list**: `http://localhost:8787/callback` (if Zoom refuses http, use an https tunnel URL and set `ZOOM_MCP_REDIRECT_URI`).
+1. In the Zoom app > **Basic Information**, set the **OAuth Redirect URL** and add it to the **allow list**: `http://localhost:8765/callback` (if Zoom refuses http, use an https tunnel URL and set `ZOOM_MCP_REDIRECT_URI`).
 2. In **Scopes** add the meeting, meeting-registrant and user read/write scopes from the table above (non-admin versions, e.g. `meeting:read`, `meeting:write`, `user:read`).
 3. Put only `ZOOM_CLIENT_ID` and `ZOOM_CLIENT_SECRET` in `credentials.json`.
 4. Run `npm run authorize`, open the printed URL, click **Allow**. Tokens (including a rotating refresh token) are saved to `C:UsersKING.zoom-mcp	okens.json`, never in the repo. Access tokens refresh automatically; if the refresh token ever lapses (Zoom expires unused ones), rerun `npm run authorize`.
