@@ -3,7 +3,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface ZoomCredentials {
-  accountId: string;
+  /** Present = Server-to-Server OAuth; absent = user OAuth (authorize once, refresh token kept in tokens.json). */
+  accountId?: string;
   clientId: string;
   clientSecret: string;
 }
@@ -23,6 +24,7 @@ export function loadCredentials(
   readFile: (p: string) => string = (p) => readFileSync(p, "utf8"),
 ): ZoomCredentials {
   const keys = ["ZOOM_ACCOUNT_ID", "ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET"] as const;
+  const required = ["ZOOM_CLIENT_ID", "ZOOM_CLIENT_SECRET"] as const;
   const vals: Record<string, string | undefined> = {};
   for (const k of keys) vals[k] = env[k]?.trim() || undefined;
 
@@ -38,16 +40,21 @@ export function loadCredentials(
       /* missing or unreadable file: fall through to the error below */
     }
   }
-  const missing = keys.filter((k) => !vals[k]);
+  const missing = required.filter((k) => !vals[k]);
   if (missing.length) {
     throw new Error(
       `Missing Zoom credential(s): ${missing.join(", ")}. Set them as environment variables or in ${path} ` +
-        `as JSON {"ZOOM_ACCOUNT_ID":"...","ZOOM_CLIENT_ID":"...","ZOOM_CLIENT_SECRET":"..."}. See README.`,
+        `as JSON {"ZOOM_CLIENT_ID":"...","ZOOM_CLIENT_SECRET":"...", "ZOOM_ACCOUNT_ID":"... (only for Server-to-Server apps)"}. See README.`,
     );
   }
   return {
-    accountId: vals.ZOOM_ACCOUNT_ID!,
+    accountId: vals.ZOOM_ACCOUNT_ID,
     clientId: vals.ZOOM_CLIENT_ID!,
     clientSecret: vals.ZOOM_CLIENT_SECRET!,
   };
+}
+
+/** Where the user-OAuth tokens (access + rotating refresh token) are kept: outside any repo. */
+export function defaultTokensPath(env: NodeJS.ProcessEnv = process.env): string {
+  return env.ZOOM_MCP_TOKENS || join(homedir(), ".zoom-mcp", "tokens.json");
 }

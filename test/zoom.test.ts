@@ -4,6 +4,7 @@ import { makeMock } from "./mockZoom.js";
 import { loadCredentials } from "../src/config.js";
 import { ZoomClient, ZoomError } from "../src/zoomClient.js";
 import * as ops from "../src/ops.js";
+import type { StoredTokens, TokenStore } from "../src/zoomClient.js";
 
 const M = "81234567890";
 const writes = (calls: { method: string }[]) => calls.filter((c) => c.method !== "GET" && !(c as any).path.startsWith("/oauth"));
@@ -11,7 +12,8 @@ const writes = (calls: { method: string }[]) => calls.filter((c) => c.method !==
 test("config: env wins, file fills gaps, error never contains secrets", () => {
   const c = loadCredentials({ ZOOM_ACCOUNT_ID: "a", ZOOM_CLIENT_ID: "b" } as any, () => JSON.stringify({ ZOOM_CLIENT_SECRET: "s3", ZOOM_CLIENT_ID: "ignored" }));
   assert.deepEqual(c, { accountId: "a", clientId: "b", clientSecret: "s3" });
-  assert.throws(() => loadCredentials({ ZOOM_CLIENT_SECRET: "topsecret" } as any, () => { throw new Error("nofile"); }), (e: Error) => /ZOOM_ACCOUNT_ID, ZOOM_CLIENT_ID/.test(e.message) && !e.message.includes("topsecret"));
+  assert.equal(loadCredentials({ ZOOM_CLIENT_ID: "b", ZOOM_CLIENT_SECRET: "s" } as any, () => "{}").accountId, undefined);
+  assert.throws(() => loadCredentials({ ZOOM_CLIENT_SECRET: "topsecret" } as any, () => { throw new Error("nofile"); }), (e: Error) => /ZOOM_CLIENT_ID/.test(e.message) && !e.message.includes("topsecret"));
 });
 
 test("token is cached and refreshed ~5 min before expiry", async () => {
@@ -157,4 +159,32 @@ test("add_to_next_meetings picks the next N upcoming, skipping past and deleted"
 test("Zoom errors surface with status and body", async () => {
   const m = makeMock();
   await assert.rejects(ops.getMeeting(m.client(), { meeting_id: "99999999" }), (e: any) => e instanceof ZoomError && e.status === 404);
+});
+
+function memStore(initial?: StoredTokens): TokenStore & { cur?: StoredTokens } {
+  const s: any = { cur: initial, read: () => s.cur, write: (t: StoredTokens) => (s.cur = t) };
+  return s;
+}
+
+test("user OAuth: refreshes with the stored refresh token and persists the rotated one", async () => {
+  const m = makeMock();
+  const store = memStore({ access_token: "old", refresh_token: "ref0", expires_at: 0 });
+  const c = new ZoomClient({ clientId: "cid", clientSecret: "csecret" }, { fetch: m.fetch, now: () => 1_000_000, tokenStore: store });
+  const w: any = await ops.whoami(c);
+  assert.equal(w.user.email, "king@example.com");
+  const tokenCall = m.calls.find((x) => x.path === "/oauth/token")!;
+  assert.equal(tokenCall.query.grant_type, "refresh_token");
+  assert.equal(tokenCall.query.account_id, undefined);
+  assert.match(store.cur!.refresh_token, /^ref[1-9]/);
+  assert.notEqual(store.cur!.refresh_token, "ref0");
+  // second client (another Claude process) reuses the still-valid stored token instead of burning the refresh token
+  const c2 = new ZoomClient({ clientId: "cid", clientSecret: "csecret" }, { fetch: m.fetch, now: () => 1_000_000, tokenStore: store });
+  await c2.getToken();
+  assert.equal(m.calls.filter((x) => x.path === "/oauth/token").length, 1);
+});
+
+test("user OAuth: clear error when never authorized", async () => {
+  const m = makeMock();
+  const c = new ZoomClient({ clientId: "cid", clientSecret: "csecret" }, { fetch: m.fetch, tokenStore: memStore() });
+  await assert.rejects(c.getToken(), (e: any) => /npm run authorize/.test(e.message));
 });

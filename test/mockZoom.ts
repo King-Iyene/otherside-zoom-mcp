@@ -22,6 +22,7 @@ export function makeMock(opts: { cancelIsNoop?: boolean; tokenExpiresIn?: number
   let tokenCount = 0;
   let clock = 1_000_000;
   const regs: MockReg[] = [];
+  const validRefresh = new Set<string>(["ref0"]);
   let nextId = 1;
   const future = (d: number) => new Date(Date.now() + d * 86400_000).toISOString();
   const meeting = {
@@ -54,6 +55,13 @@ export function makeMock(opts: { cancelIsNoop?: boolean; tokenExpiresIn?: number
       calls.push({ method, path, query });
       const auth = (init?.headers as Record<string, string>)?.Authorization ?? "";
       if (auth !== "Basic " + Buffer.from("cid:csecret").toString("base64")) return json(401, { reason: "Invalid client_id or client_secret" });
+      if (query.grant_type === "refresh_token") {
+        if (!validRefresh.has(query.refresh_token)) return json(400, { reason: "Invalid refresh token" });
+        validRefresh.delete(query.refresh_token);
+        const nr = `ref${tokenCount}`;
+        validRefresh.add(nr);
+        return json(200, { access_token: `tok${tokenCount}`, refresh_token: nr, expires_in: opts.tokenExpiresIn ?? 3600 });
+      }
       if (query.grant_type !== "account_credentials" || query.account_id !== "acct") return json(400, { reason: "bad request" });
       return json(200, { access_token: `tok${tokenCount}`, token_type: "bearer", expires_in: opts.tokenExpiresIn ?? 3600 });
     }
