@@ -52,7 +52,7 @@ if (manual) {
     /* handled below */
   }
   const code = u?.searchParams.get("code");
-  if (!u || !code || u.searchParams.get("state") !== state) {
+  if (!u || !code || (u.searchParams.has("state") && u.searchParams.get("state") !== state)) {
     console.error("No code found, or state mismatch. Run npm run authorize again and use the new link.");
     process.exit(1);
   }
@@ -72,7 +72,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   const code = u.searchParams.get("code");
-  if (!code || u.searchParams.get("state") !== state) {
+  if (!code || (u.searchParams.has("state") && u.searchParams.get("state") !== state)) {
     res.writeHead(400).end("Missing code or state mismatch. Start again with npm run authorize.");
     return;
   }
