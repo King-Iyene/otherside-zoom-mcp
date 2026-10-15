@@ -1,4 +1,4 @@
-import { ZoomClient } from "./zoomClient.js";
+import { ZoomClient, ZoomError } from "./zoomClient.js";
 
 /** Zoom meeting id, digits only (can exceed 10 digits). */
 export type MeetingId = string;
@@ -22,18 +22,20 @@ const sameEmail = (a?: string, b?: string) => !!a && !!b && a.trim().toLowerCase
 
 export async function whoami(c: ZoomClient) {
   await c.getToken();
-  const { data } = await c.request<any>("GET", "/users/me");
-  return {
-    token: "ok (Server-to-Server OAuth token obtained)",
-    user: {
-      id: data?.id,
-      email: data?.email,
-      display_name: data?.display_name,
-      type: data?.type,
-      account_id: data?.account_id,
-      timezone: data?.timezone,
-    },
-  };
+  const token = "ok (OAuth token obtained)";
+  try {
+    const { data } = await c.request<any>("GET", "/users/me");
+    return {
+      token,
+      user: { id: data?.id, email: data?.email, display_name: data?.display_name, type: data?.type, account_id: data?.account_id, timezone: data?.timezone },
+    };
+  } catch (e) {
+    // Token works but the app lacks the user:read scope: still a successful connection test.
+    if (e instanceof ZoomError && (e.status === 400 || e.status === 403)) {
+      return { token, user: "not available: " + e.message + " (add the user:read:user:admin scope to see it; not needed for registrant work)" };
+    }
+    throw e;
+  }
 }
 
 export async function listMeetings(
