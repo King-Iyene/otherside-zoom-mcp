@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import * as ops from "./ops.js";
+import { callAttendance } from "./attendance.js";
 import { ZoomClient, ZoomError } from "./zoomClient.js";
 
 const meetingId = z.string().regex(/^\d{6,15}$/, "digits only, e.g. 81234567890").describe("Zoom meeting ID (digits only)");
@@ -27,6 +28,22 @@ export function createServer(client: ZoomClient): McpServer {
     "zoom_whoami",
     { description: "Test the Zoom connection: fetches an OAuth token and returns the Zoom user/account the app acts as. Read-only.", inputSchema: {} },
     () => wrap(() => ops.whoami(client)),
+  );
+
+  server.registerTool(
+    "zoom_call_attendance",
+    {
+      description:
+        "Who registered for one Catalyst call and who actually joined (read-only). Pass the meeting id and the call date in New York time (default today). Returns status: live (call still running, report later), not_started, no_session_found (Zoom data can lag 10-30 min), or done with attended / missed lists (VIP flag, minutes on the call) and anyone who joined without registering. Team emails (joinotherside.com) are excluded.",
+      inputSchema: {
+        meeting_id: meetingId,
+        date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Call date in America/New_York, YYYY-MM-DD. Default today."),
+        min_minutes: z.number().int().min(1).max(90).optional().describe("Minutes on the call to count as present. Default 5."),
+        exclude_domains: z.array(z.string()).optional(),
+        exclude_emails: z.array(z.string()).optional(),
+      },
+    },
+    (a) => wrap(() => callAttendance(client, a)),
   );
 
   server.registerTool(
