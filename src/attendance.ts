@@ -111,7 +111,7 @@ export async function callAttendance(c: ZoomClient, a: AttendanceArgs, now: () =
   }
 
   const reg = await listRegistrants(c, { meeting_id: a.meeting_id, occurrence_id: occ.occurrence_id, all_pages: true, page_size: 300 });
-  const teamName = /otherside team|notetaker/i;
+  const teamName = /otherside team|notetaker|edward bertsch|samson odusanya|roberto pa[eé]z/i;
   const men = reg.registrants.filter(
     (r) => !isTeam(String(r.email ?? "").toLowerCase()) && !teamName.test(`${r.first_name ?? ""} ${r.last_name ?? ""}`),
   );
