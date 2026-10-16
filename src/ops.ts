@@ -52,8 +52,10 @@ export async function listMeetings(
     token = data?.next_page_token || undefined;
     if (!token) break;
   }
+  const seen = new Set<string>();
+  const unique = out.filter((m) => (seen.has(String(m.id)) ? false : (seen.add(String(m.id)), true))); // Zoom lists each occurrence of a recurring meeting separately
   const needle = a.topic_contains?.toLowerCase();
-  const meetings = needle ? out.filter((m) => String(m.topic ?? "").toLowerCase().includes(needle)) : out;
+  const meetings = needle ? unique.filter((m) => String(m.topic ?? "").toLowerCase().includes(needle)) : unique;
   if (a.include_occurrences) {
     for (const m of meetings) {
       if (m.type === 8 || m.type === 3) {
